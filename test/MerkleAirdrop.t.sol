@@ -14,6 +14,7 @@ contract MerkleAirdropTest is ZkSyncChainChecker, Test {
     ToraToken private token;
 
     bytes32 public ROOT = 0xaa5d581231e596618465a56aa0f5870ba6e20785fe436d5bfb82b08662ccc7c4;
+    address gasPayer;
     address user;
     uint256 userPrivkey;
 
@@ -29,21 +30,27 @@ contract MerkleAirdropTest is ZkSyncChainChecker, Test {
         } else {
             token = new ToraToken();
             merkleAirdrop = new MerkleAirdrop(ROOT, token);
-            token.mint(address(merkleAirdrop), AMOUNT * 4);
+            token.mint(token.owner(), AMOUNT * 4);
+            token.transfer(address(merkleAirdrop), AMOUNT * 4);
             console.log("User address: ", user);
         }
         (user, userPrivkey) = makeAddrAndKey("user");
+        gasPayer = makeAddr("gasPayer");
     }
 
     function testUserCanClaim() public {
         uint256 startingBalance = token.balanceOf(user);
+        bytes32 digest = merkleAirdrop.getMessageHash(user, AMOUNT);
 
-        vm.prank(user);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(userPrivkey, digest);
 
-        merkleAirdrop.claim(user, AMOUNT, PROOF);
+        vm.prank(gasPayer);
+        merkleAirdrop.claim(user, AMOUNT, PROOF, v, r, s);
+        uint256 merkleAirdropBalanceAfterClaimOne = token.balanceOf(address(merkleAirdrop));
 
         uint256 endingBalance = token.balanceOf(user);
 
         assertEq(endingBalance - startingBalance, AMOUNT);
+        assertEq(merkleAirdropBalanceAfterClaimOne, AMOUNT * 3);
     }
 }
