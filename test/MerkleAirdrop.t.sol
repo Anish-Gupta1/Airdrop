@@ -6,7 +6,10 @@ import {console} from "forge-std/console.sol";
 import {MerkleAirdrop} from "../src/MerkleAirdrop.sol";
 import {ToraToken} from "../src/ToraToken.sol";
 
-contract MerkleAirdropTest is Test {
+import {ZkSyncChainChecker} from "lib/foundry-devops/src/ZkSyncChainChecker.sol";
+import {DeployMerkleAirdrop} from "script/DeployMerkleAirdrop.s.sol";
+
+contract MerkleAirdropTest is ZkSyncChainChecker, Test {
     MerkleAirdrop private merkleAirdrop;
     ToraToken private token;
 
@@ -20,11 +23,16 @@ contract MerkleAirdropTest is Test {
     bytes32[] public PROOF = [proofOne, proofTwo];
 
     function setUp() public {
-        token = new ToraToken();
-        merkleAirdrop = new MerkleAirdrop(ROOT, token);
-        token.mint(address(merkleAirdrop), AMOUNT * 4);
+        if (!isZkSyncChain()) {
+            DeployMerkleAirdrop deployer = new DeployMerkleAirdrop();
+            (merkleAirdrop, token) = deployer.deployMerkleAirdrop();
+        } else {
+            token = new ToraToken();
+            merkleAirdrop = new MerkleAirdrop(ROOT, token);
+            token.mint(address(merkleAirdrop), AMOUNT * 4);
+            console.log("User address: ", user);
+        }
         (user, userPrivkey) = makeAddrAndKey("user");
-        console.log("User address: ", user);
     }
 
     function testUserCanClaim() public {
